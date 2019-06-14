@@ -19,6 +19,7 @@ setwd(workingDir)
 options(stringsAsFactors = FALSE)
 
 # Load required libraries
+source('Code/0_loadLibraries.R')
 source("Code/coreDEA_1.R")
 source("Code/coreDEA_2.R")
 source("Code/coreDEA_3.R")
@@ -55,7 +56,9 @@ eset <- getRCCSet(metadata)
 
 ##### Imaging QC
 # Imaging QC refers to the percentage of fields of view (FOVs) successfully counted by a Digital Analyzer scan of a lane. When a substantial percentage of FOVs are not successfully counted, there may be issues with the resulting data (see nSolver User Manual).
+pdf(file = 'Results/NAC/QC_plotFOV.pdf')
 plotFOV.key1(eset = eset, metadata = metadata, fov_threshold = 80)
+dev.off()
 
 # As there is a sample under the % FOV counted threshold we remove it
 metadata <- pData(eset) %>% 
@@ -67,17 +70,22 @@ metadata <- pData(eset) %>%
 
 ##### Binding density QC
 #Due to the nature of the nCounter technology, analysis of some samples may produce too many or too few probes to be accurately counted by the Digital Analyzer. When too many probes are present, the Digital Analyzer is not able to distinguish each and every probe present in the lane. When too few fluorescent species are present, the Digital Analyzer may have difficulty focusing on the lane surface. Therefore, a measurement of mean binding density (spots per square micron) is provided with each lane scanned. The linear range of counting extends from 0.05 to 2.25 spots per square micron for assays run on an nCounter MAX or FLEX system. The range is 0.05 to 1.18 spots per square micron for assays run on the nCounter SPRINT system.  (see nSolver User Manual).
+pdf(file = 'Results/NAC/QC_plotBD.pdf')
 plotBD.key1(eset = eset, metadata = metadata)
+dev.off()
 # All samples are in the binding density range
 
 
 ##### Positive Controls
 # Check the expression of the positive controls. The positive genes follow the expeted pattern of expresssion.
+pdf(file = 'Results/NAC/QC_posContrl_boxplot.pdf')
 boxplot_expr(eset,is_positive)
+dev.off()
 
 # Check the expression of the negative controls
+pdf(file = 'Results/NAC/QC_negContrl_boxplot.pdf')
 boxplot_expr(eset,is_negative)
-
+dev.off()
 
 ##### Noise Threshold  
 # We establish a noise threshold. This threshold is based on the mean and standard deviation of counts of the negative control genes and represents the background noise. We define it as the mean expression of the negative genes counts + 2 times the standard deviation.
@@ -87,20 +95,25 @@ lod = mean(lodcounts$count) + 2 * sd(lodcounts$count)
 
 ##### Housekeeping genes  
 # Expression of each housekeeping genes in all samples. The line in red represents the noise threshold.
+pdf(file = 'Results/NAC/hK_exprs_boxplot.pdf')
 boxplot_expr(eset,is_housekeeping) + geom_hline(yintercept = (lod),colour="red")
+dev.off()
 # We can observe that all the housekeeping genes have enough expression (above the noise threshold).
 
 
 ##### Expression of all the housekeeping genes in each sample.  
 # We plot the mean expression of all the housekeeping genes in each sample.
+pdf(file = 'Results/NAC/hK_mean_exprs_boxplot.pdf')
 hK_mean_exprs_plot(eset, metadata, lod)
+dev.off()
 # We can obverve that some sample have overall low expression for the housekeeping genes, but all are above the noise threshold.
 
 
 ##### General expression
 # Expression of all genes (Endogenous + Housekeeping).
+pdf(file = 'Results/NAC/general_exprs_plot.pdf')
 general_exprs_plot(eset, metadata, noise_threshold = lod)
-
+dev.off()
 
 #######################################################
 # NORMALIZATION
@@ -109,7 +122,8 @@ general_exprs_plot(eset, metadata, noise_threshold = lod)
 ##### Housekeeping normalization
 # We select thouse housekeeping genes that have expression values greater than the noise threshold and a mean value of expression of at least 200 counts.
 
-hk = ncounts[grepl("Housekeeping", rownames(ncounts)),]
+counts = exprs(eset)[, metadata$Sample.name]
+hk = counts[grepl("Housekeeping", rownames(counts)),]
 abovenoise = rowSums(hk > (lod)) >= (ncol(hk))
 hk_abovenoise = hk[abovenoise,]
 aboveMean = (apply(hk_abovenoise,1,mean))>= 200
@@ -125,20 +139,22 @@ hkFactor = function(counts, hk_norm) {
   nf = mean(geoMeans) / geoMeans
   return(nf)}
 
-metadata$hk_nf = hkFactor(ncounts, hk_norm)
-ncounts = ncounts %*% diag(metadata$hk_nf)
+metadata$hk_nf = hkFactor(counts, hk_norm)
+ncounts = counts %*% diag(metadata$hk_nf)
 colnames(ncounts) = colnames(counts)
 postnorm = ncounts %>%
   data.frame() %>%
   tidyr::gather("sample", "count")
 postnorm$sample<-gsub("X","",postnorm$sample)
 
+pdf(file = 'Results/NAC/postnorm_exprs_plot.pdf')
 ggplot(postnorm, aes(sample, count)) + geom_boxplot(colour = "black", fill = "#56B4E9",outlier.size = 0.5) +
   scale_y_continuous(trans = "log2") + 
   xlab("") + ggtitle("") + theme(axis.text.x = element_text(angle = 90, 
                                                             hjust = 1,vjust = 0.5,size = 5))+
   geom_smooth(se=T, aes(group=1))+
   geom_hline(yintercept = lod,colour="red")
+dev.off()
 
 ##### Drop genes and produce the normalised counts matrix
 # We’ll drop the genes that are below the LOD in over 80% of the samples:
@@ -232,24 +248,21 @@ enrich_rs = enrich_cp(res, "NAC", type="all")
 enrich_summary = enrich_rs$summary %>% arrange(p.adjust)
 enrich_summary = convert_enriched_ids(enrich_summary,entrezsymbol = entrezsymbol) %>% arrange(p.adjust)
 write_csv(x = enrich_summary,path = "Results/NAC/NACstatus_enrichment.csv" )
-save(enrich_rs, file = 'Data/RData/enrich_rs.RData')
 
 # We perform also a classic enrichment analysis for GO, Reactome and KEGG using the genes substantially over-expressed and under-expressed. We will use a two-fold fold-change cutoff
 enrichover_rs = enrich_cp(res, "NAC", type="over")
 enrichover_summary = enrichover_rs$summary %>% arrange(p.adjust)
 enrichover_summary = convert_enriched_ids(enrichover_summary,entrezsymbol = entrezsymbol) %>% arrange(p.adjust)
 write_csv(x = enrichover_summary,path = "Results/NAC/NACstatus_over_enrichment.csv" )
-save(enrichover_rs, file = 'Data/RData/enrichover_rs.RData')
 
 enrichunder_rs = enrich_cp(res, "NAC", type="under")
 enrichunder_summary = enrichunder_rs$summary %>% arrange(p.adjust)
 enrichunder_summary = convert_enriched_ids(enrichunder_summary,entrezsymbol = entrezsymbol) %>% arrange(p.adjust)
 write_csv(x = enrichunder_summary,path = "Results/NAC/NACstatus_under_enrichment.csv" )
-save(enrichunder_rs, file = 'Data/RData/enrichunder_rs.RData')
 
 # Finally we can see the GO BP, Reactome and KEGG pathways enriched.
-save(enrich_rs, enrichover_rs, enrichunder_rs, file = file = 'Data/NAC_enrichments.RData')
-load('Data/NAC_enrichments.RData')
+save(enrich_rs, enrichover_rs, enrichunder_rs, file = 'Data/RData/NAC_enrichments.RData')
+load('Data/RData/NAC_enrichments.RData')
 
 # GO BP Enrichment in all the significantly expressed genes:
 pdf(file = 'Results/NAC/GO_BP_all_dotplot.pdf')
