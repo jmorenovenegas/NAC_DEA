@@ -19,6 +19,7 @@ setwd(workingDir)
 options(stringsAsFactors = FALSE)
 
 # Load required libraries
+source('Code/0_loadLibraries.R')
 source("Code/coreDEA_1.R")
 source("Code/coreDEA_2.R")
 source("Code/coreDEA_3.R")
@@ -123,6 +124,7 @@ dev.off()
 ##### Housekeeping normalization
 # We select thouse housekeeping genes that have expression values greater than the noise threshold and a mean value of expression of at least 200 counts.
 
+counts = exprs(eset)[, metadata$Sample.name]
 hk = counts[grepl("Housekeeping", rownames(counts)),]
 abovenoise = rowSums(hk > (lod)) >= (ncol(hk))
 hk_abovenoise = hk[abovenoise,]
@@ -179,7 +181,7 @@ load(file = "Data/RData/BL-NAC_HKnormalised_counts.RData")
 
 design = ~ key1
 dea.o <- getDE(ncounts = round(ncounts), metadata = metadata, design = design)
-write_csv(dea.o, "Results/NAC-DEA.csv")
+write_csv(dea.o, "Results/NAC-BL/NAC-BL-DEA.csv")
 dea.p <- dea.o %>% dplyr::filter(padj <0.05) %>% arrange(-log2FoldChange)
 View(dea.p)
 
@@ -232,7 +234,7 @@ res$refseq_mrna = converted
 lost.genes = length(res$rowname) - length((res %>% data.frame() %>% left_join(entrez, by = "refseq_mrna") %>% 
                                              filter(!is.na(entrezgene)) %>% filter(!is.na(log2FoldChange)) %>% filter(!is.na(lfcSE)))$rowname)
 
-gsea_rs = gsea_cp(res, "NACstatus")
+gsea_rs = gsea_cp(res, "NAC-BL_status")
 
 gsea_summary = gsea_rs$summary %>% arrange(pvalue)
 gsea_summary = convert_gsea_results(gsea_summary)
@@ -244,25 +246,25 @@ write_csv(x = gsea_summary, path = "Results/NAC-BL/BL-NACstatus_gsea.csv")
 # The core_symbols are the genes that most strongly contributed to the pathway score, so the ones with the highest or lowest enrichment score depending on the direction of enrichment.
 
 # We perform a classic enrichment analysis in GO, Reactome and KEGG for all the genes differentially epressed by NAC.
-enrich_rs = enrich_cp(res, "NAC", type="all")
+enrich_rs = enrich_cp(res, "NAC-BL", type="all")
 enrich_summary = enrich_rs$summary %>% arrange(p.adjust)
 enrich_summary = convert_enriched_ids(enrich_summary,entrezsymbol = entrezsymbol) %>% arrange(p.adjust)
 write_csv(x = enrich_summary,path = "Results/NAC-BL/BL-NACstatus_enrichment.csv" )
 
 # We perform also a classic enrichment analysis for GO, Reactome and KEGG using the genes substantially over-expressed and under-expressed. We will use a two-fold fold-change cutoff
-enrichover_rs = enrich_cp(res, "NAC", type="over")
+enrichover_rs = enrich_cp(res, "NAC-BL", type="over")
 enrichover_summary = enrichover_rs$summary %>% arrange(p.adjust)
 enrichover_summary = convert_enriched_ids(enrichover_summary,entrezsymbol = entrezsymbol) %>% arrange(p.adjust)
 write_csv(x = enrichover_summary,path = "Results/NAC-BL/BL-NACstatus_over_enrichment.csv" )
 
-enrichunder_rs = enrich_cp(res, "NAC", type="under")
+enrichunder_rs = enrich_cp(res, "NAC-BL", type="under")
 enrichunder_summary = enrichunder_rs$summary %>% arrange(p.adjust)
 enrichunder_summary = convert_enriched_ids(enrichunder_summary,entrezsymbol = entrezsymbol) %>% arrange(p.adjust)
 write_csv(x = enrichunder_summary,path = "Results/NAC-BL/BL-NACstatus_under_enrichment.csv" )
 
 # Finally we can see the GO BP, Reactome and KEGG pathways enriched.
-save(enrich_rs, enrichunder_rs, enrichover_rs, file = 'Data/NAC-BL_enrichments.RData')
-load(file = 'Data/NAC-BL_enrichments.RData')
+save(enrich_rs, enrichunder_rs, enrichover_rs, file = 'Data/RData/NAC-BL_enrichments.RData')
+load(file = 'Data/RData/NAC-BL_enrichments.RData')
 
 # GO BP Enrichment in all the significantly expressed genes:
 pdf(file = 'Results/NAC-BL/GO_BP_all_dotplot.pdf')
