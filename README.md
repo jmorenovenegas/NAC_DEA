@@ -26,6 +26,7 @@ After the execution you could find:
 
 Requirements:
 - R version 3.5.1
+
 R libraries (installations calls inside the code):
 - NanoStringQCPro
 - dplyr
