@@ -27,6 +27,8 @@ source("Code/coreDEA_4.R")
 loadpkg("rgl")
 loadpkg("calibrate") # To label the volcano plot
 
+dir.create('Data/RData')
+dir.create('Results/NAC-BL')
 
 #######################################################
 # LOAD DATA
