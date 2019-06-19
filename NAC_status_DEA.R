@@ -28,6 +28,7 @@ loadpkg("rgl")
 loadpkg("calibrate") # To label the volcano plot
 
 dir.create('Data/RData')
+dir.create('Results')
 dir.create('Results/NAC')
 
 #######################################################
